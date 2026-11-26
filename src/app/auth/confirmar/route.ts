@@ -2,7 +2,7 @@ import type { EmailOtpType } from "@supabase/supabase-js";
 import { NextResponse, type NextRequest } from "next/server";
 import { criarClienteServidor } from "@/lib/supabase/server";
 
-// Link do e-mail de confirmação de conta.
+// Links dos e-mails de confirmação de conta e de recuperação de senha.
 export async function GET(request: NextRequest) {
   const { searchParams } = request.nextUrl;
   const tokenHash = searchParams.get("token_hash");
@@ -16,5 +16,8 @@ export async function GET(request: NextRequest) {
       ? await supabase.auth.exchangeCodeForSession(code)
       : { error: new Error("link inválido") };
 
-  return NextResponse.redirect(new URL(error ? "/login" : "/", request.url));
+  // Só segue para caminhos internos (ex.: /nova-senha no link de recuperação).
+  const proximo = searchParams.get("proximo");
+  const destino = proximo?.startsWith("/") && !proximo.startsWith("//") ? proximo : "/";
+  return NextResponse.redirect(new URL(error ? "/login?erro=link" : destino, request.url));
 }
