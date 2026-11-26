@@ -11,6 +11,7 @@ export async function exigirEmpresa() {
     .from("membros")
     .select("empresa_id, papel, empresas(nome)")
     .eq("user_id", auth.claims.sub)
+    .order("created_at")
     .limit(1)
     .maybeSingle();
   if (!membro) redirect("/bem-vindo");
