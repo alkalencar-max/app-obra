@@ -1,5 +1,6 @@
-import { bm, mesAno, porcento, reais } from "@/lib/formato";
+import { bm, dataBr, mesAno, porcento, reais } from "@/lib/formato";
 import { exigirEmpresa } from "@/lib/sessao";
+import { BotaoImprimir } from "./compras/[cot]/imprimir";
 import { CurvaS, type PontoCurva } from "./curva-s";
 import { BarraInline, BarrasEtapas, COR, ColunasMedicao, Legenda } from "./graficos";
 
@@ -12,7 +13,7 @@ export default async function Dashboard({ params, searchParams }: PageProps<"/ob
 
   const [{ data: obra }, { data: etapas }, { data: grupos }, { data: medicoes }, { data: cronograma }, { data: apropriacoes }, { data: realizadoMensal }, { data: pedidosEtapa }] =
     await Promise.all([
-      supabase.from("obras").select("area_m2").eq("id", id).single(),
+      supabase.from("obras").select("nome, endereco, area_m2").eq("id", id).single(),
       supabase.from("v_etapa_resumo").select("etapa_id, nome, ordem, orcado, pago, a_pagar").eq("obra_id", id).order("ordem"),
       supabase.from("v_grupo_resumo").select("grupo, pago").eq("obra_id", id).order("pago", { ascending: false }),
       supabase.from("v_medicao_resumo").select("numero, pago").eq("obra_id", id).order("numero"),
@@ -49,65 +50,8 @@ export default async function Dashboard({ params, searchParams }: PageProps<"/ob
   const somaMedicoes = (medicoes ?? []).reduce((s, m) => s + Number(m.pago), 0);
   const lancSemMedicao = pago - somaMedicoes;
 
-  return (
-    <div className="space-y-6">
-      <section className="grid grid-cols-2 gap-3 md:grid-cols-4">
-        <Indicador rotulo={`Medição atual ${bm(ultimaMedicao?.numero)}`} valor={reais(ultimaMedicao?.pago)} />
-        <Indicador rotulo="Total realizado (pago)" valor={reais(pago)} destaque />
-        <Indicador rotulo="Preço por m²" valor={area ? reais(pago / area) : "informe a área"} />
-        <Indicador rotulo="Pago ao empreiteiro" valor={reais(empreiteiro)} />
-        <Indicador rotulo="Orçamento global" valor={reais(orcado)} />
-        <Indicador rotulo="Saldo do orçamento" valor={reais(orcado - pago)} />
-        <Indicador rotulo={`Previsto no cronograma até ${mesAno(mesRef)}`} valor={reais(previsto)} />
-        <Indicador
-          rotulo="Divergência realizado x previsto"
-          valor={reais(pago - previsto)}
-          cor={pago - previsto > 0 ? "text-red-600" : "text-emerald-700"}
-        />
-      </section>
-      {aPagar > 0 && <p className="text-sm text-stone-600">Além do realizado, há {reais(aPagar)} lançados como a pagar.</p>}
-
-      {meses.length > 0 && (
-        <form className="flex flex-wrap items-end gap-2 text-sm">
-          <label className="rotulo" htmlFor="mes">Mês de referência do cronograma</label>
-          <select id="mes" name="mes" defaultValue={meses.includes(mesRef) ? mesRef : ""} className="campo w-auto">
-            <option value="">mês atual</option>
-            {meses.map((m) => <option key={m} value={m}>{mesAno(m)}</option>)}
-          </select>
-          <button className="botao-secundario">Atualizar</button>
-        </form>
-      )}
-
-      {curva.length > 1 && (
-        <section className="cartao space-y-2">
-          <div className="flex flex-wrap items-baseline justify-between gap-2">
-            <h2 className="font-semibold">Previsto x realizado, acumulado mês a mês</h2>
-            <Legenda
-              itens={[
-                { cor: COR.previsto, nome: "Previsto (cronograma)", tracejado: true },
-                { cor: COR.realizado, nome: "Realizado (pago)" },
-              ]}
-            />
-          </div>
-          <CurvaS pontos={curva} />
-        </section>
-      )}
-
-      <section className="cartao space-y-3">
-        <div className="flex flex-wrap items-baseline justify-between gap-2">
-          <h2 className="font-semibold">Orçado x realizado por etapa</h2>
-          <Legenda
-            itens={[
-              { cor: COR.orcado, nome: "Orçado" },
-              { cor: COR.realizado, nome: "Realizado" },
-              { cor: COR.estouro, nome: "Acima do orçado" },
-            ]}
-          />
-        </div>
-        <BarrasEtapas etapas={listaEtapas} />
-        <details className="overflow-x-auto">
-          <summary className="cursor-pointer text-sm text-stone-600">Ver tabela</summary>
-        <table className="tabela mt-2">
+  const tabelaEtapas = (
+        <table className="tabela mt-2 print:text-xs">
           <thead>
             <tr>
               <th>Etapa</th>
@@ -155,10 +99,82 @@ export default async function Dashboard({ params, searchParams }: PageProps<"/ob
             </tr>
           </tfoot>
         </table>
+  );
+
+  return (
+    <div className="space-y-6 print:space-y-4">
+      <div className="hidden print:block">
+        <h1 className="text-xl font-bold">Dashboard · {obra?.nome}</h1>
+        <p className="text-sm text-stone-600">
+          {obra?.endereco} {area ? `· ${area.toLocaleString("pt-BR")} m²` : ""} · cronograma até {mesAno(mesRef)} · emitido em {dataBr(new Date().toISOString())}
+        </p>
+      </div>
+      <section className="grid grid-cols-2 gap-3 md:grid-cols-4 print:grid-cols-4 print:gap-2">
+        <Indicador rotulo={`Medição atual ${bm(ultimaMedicao?.numero)}`} valor={reais(ultimaMedicao?.pago)} />
+        <Indicador rotulo="Total realizado (pago)" valor={reais(pago)} destaque />
+        <Indicador rotulo="Preço por m²" valor={area ? reais(pago / area) : "informe a área"} />
+        <Indicador rotulo="Pago ao empreiteiro" valor={reais(empreiteiro)} />
+        <Indicador rotulo="Orçamento global" valor={reais(orcado)} />
+        <Indicador rotulo="Saldo do orçamento" valor={reais(orcado - pago)} />
+        <Indicador rotulo={`Previsto no cronograma até ${mesAno(mesRef)}`} valor={reais(previsto)} />
+        <Indicador
+          rotulo="Divergência realizado x previsto"
+          valor={reais(pago - previsto)}
+          cor={pago - previsto > 0 ? "text-red-600" : "text-emerald-700"}
+        />
+      </section>
+      {aPagar > 0 && <p className="text-sm text-stone-600">Além do realizado, há {reais(aPagar)} lançados como a pagar.</p>}
+
+      <div className="flex flex-wrap items-end justify-between gap-3 print:hidden">
+      {meses.length > 0 ? (
+        <form className="flex flex-wrap items-end gap-2 text-sm">
+          <label className="rotulo" htmlFor="mes">Mês de referência do cronograma</label>
+          <select id="mes" name="mes" defaultValue={meses.includes(mesRef) ? mesRef : ""} className="campo w-auto">
+            <option value="">mês atual</option>
+            {meses.map((m) => <option key={m} value={m}>{mesAno(m)}</option>)}
+          </select>
+          <button className="botao-secundario">Atualizar</button>
+        </form>
+      ) : <span />}
+        <BotaoImprimir />
+      </div>
+
+      {curva.length > 1 && (
+        <section className="cartao space-y-2">
+          <div className="flex flex-wrap items-baseline justify-between gap-2">
+            <h2 className="font-semibold">Previsto x realizado, acumulado mês a mês</h2>
+            <Legenda
+              itens={[
+                { cor: COR.previsto, nome: "Previsto (cronograma)", tracejado: true },
+                { cor: COR.realizado, nome: "Realizado (pago)" },
+              ]}
+            />
+          </div>
+          <CurvaS pontos={curva} />
+        </section>
+      )}
+
+      <section className="cartao space-y-3">
+        <div className="flex flex-wrap items-baseline justify-between gap-2">
+          <h2 className="font-semibold">Orçado x realizado por etapa</h2>
+          <Legenda
+            itens={[
+              { cor: COR.orcado, nome: "Orçado" },
+              { cor: COR.realizado, nome: "Realizado" },
+              { cor: COR.estouro, nome: "Acima do orçado" },
+            ]}
+          />
+        </div>
+        <BarrasEtapas etapas={listaEtapas} />
+        <details className="overflow-x-auto print:hidden">
+          <summary className="cursor-pointer text-sm text-stone-600">Ver tabela</summary>
+          {tabelaEtapas}
         </details>
+        {/* No papel a tabela sai sempre aberta. */}
+        <div className="hidden print:block">{tabelaEtapas}</div>
       </section>
 
-      <div className="grid gap-6 lg:grid-cols-2">
+      <div className="grid gap-6 lg:grid-cols-2 print:gap-4">
         <Resumo titulo="Gasto por grupo" linhas={(grupos ?? []).map((g) => ({ nome: g.grupo, valor: Number(g.pago) }))} total={pago} area={area} />
         <Resumo titulo="Gasto por apropriação" linhas={(apropriacoes ?? []).map((a) => ({ nome: a.nome, valor: Number(a.pago) }))} total={pago} area={area} />
         <Resumo titulo="Valor por medição" linhas={(medicoes ?? []).map((m) => ({ nome: bm(m.numero), valor: Number(m.pago) }))} total={pago} area={area}>

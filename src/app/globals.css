@@ -42,3 +42,25 @@ html {
     font-size: 16px !important;
   }
 }
+
+/* Impressão / PDF: A4, cores dos gráficos preservadas, cartões sem quebra no meio. */
+@media print {
+  @page {
+    size: A4;
+    margin: 12mm;
+  }
+  html,
+  body {
+    background: white !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+  .cartao,
+  tr,
+  svg {
+    break-inside: avoid;
+  }
+  .cartao {
+    padding: 0.6rem;
+  }
+}
