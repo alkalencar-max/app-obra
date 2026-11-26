@@ -1,16 +1,8 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { hojeBr, txt, valorBr } from "@/lib/campos";
 import { exigirEmpresa } from "@/lib/sessao";
-
-const txt = (form: FormData, campo: string) => String(form.get(campo) ?? "").trim() || null;
-
-const valorBr = (s: string | null) => {
-  if (!s) return NaN;
-  // aceita "1.234,56", "1234,56" e "1234.56"
-  const limpo = s.replace(/[^\d,.-]/g, "");
-  return Number(limpo.includes(",") ? limpo.replace(/\./g, "").replace(",", ".") : limpo);
-};
 
 export type EstadoLancamento = { erro?: string; ok?: number };
 
@@ -73,7 +65,7 @@ export async function excluirLancamento(obraId: string, form: FormData) {
 
 export async function marcarPago(obraId: string, form: FormData) {
   const { supabase } = await exigirEmpresa();
-  const { error } = await supabase.from("lancamentos").update({ status: "pago" }).eq("id", String(form.get("id"))).eq("obra_id", obraId);
+  const { error } = await supabase.from("lancamentos").update({ status: "pago", data: hojeBr() }).eq("id", String(form.get("id"))).eq("obra_id", obraId);
   if (error) throw new Error(error.message);
   revalidatePath(`/obras/${obraId}`, "layout");
 }
