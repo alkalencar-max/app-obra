@@ -170,7 +170,7 @@ export default async function Dashboard({ params, searchParams }: PageProps<"/ob
             <Conferencia nome="Lançamentos (por apropriação)" valor={somaApropriacoes} esperado={somaApropriacoes} />
             <Conferencia nome="Soma por etapas" valor={pago} esperado={somaApropriacoes} />
             <Conferencia nome="Soma por grupos" valor={somaGrupos} esperado={somaApropriacoes} />
-            <Conferencia nome="Soma por medições" valor={somaMedicoes} esperado={somaApropriacoes} />
+            <Conferencia nome="Soma por medições" valor={somaMedicoes} esperado={somaApropriacoes} soAviso />
           </ul>
           {Math.abs(lancSemMedicao) >= 0.01 && (
             <p className="mt-2 text-xs text-stone-500">Diferença nas medições: {reais(lancSemMedicao)} em lançamentos sem nº de medição.</p>
@@ -236,13 +236,14 @@ function Resumo({
   );
 }
 
-function Conferencia({ nome, valor, esperado }: { nome: string; valor: number; esperado: number }) {
+// soAviso: diferença esperada (ex.: lançamentos ainda sem nº de medição) aparece em amarelo, não como erro.
+function Conferencia({ nome, valor, esperado, soAviso }: { nome: string; valor: number; esperado: number; soAviso?: boolean }) {
   const ok = Math.abs(valor - esperado) < 0.01;
   return (
     <li className="flex justify-between">
       <span>{nome}</span>
-      <span className={`tabular-nums ${ok ? "text-emerald-700" : "text-red-600"}`}>
-        {reais(valor)} {ok ? "✓" : "✗"}
+      <span className={`tabular-nums ${ok ? "text-emerald-700" : soAviso ? "text-amber-700" : "text-red-600"}`}>
+        {reais(valor)} {ok ? "✓" : soAviso ? "⚠" : "✗"}
       </span>
     </li>
   );
