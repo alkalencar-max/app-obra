@@ -41,7 +41,7 @@ export function CurvaS({ pontos }: { pontos: PontoCurva[] }) {
 
   return (
     <div className="relative" ref={caixa}>
-      <svg width={W} height={H} viewBox={`0 0 ${W} ${H}`} className="block" role="img" aria-label="Curva previsto x realizado acumulado">
+      <svg width={W} height={H} viewBox={`0 0 ${W} ${H}`} className="block max-w-full print:h-auto print:w-full" role="img" aria-label="Curva previsto x realizado acumulado">
         {ticks.map((t) => (
           <g key={t}>
             <line x1={L} x2={W - R} y1={y(t)} y2={y(t)} stroke="#e7e5e4" strokeWidth={1} />
