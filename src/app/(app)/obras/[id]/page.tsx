@@ -10,7 +10,7 @@ export default async function Dashboard({ params, searchParams }: PageProps<"/ob
   const { mes: mesParam } = await searchParams;
   const { supabase } = await exigirEmpresa();
 
-  const [{ data: obra }, { data: etapas }, { data: grupos }, { data: medicoes }, { data: cronograma }, { data: apropriacoes }, { data: realizadoMensal }] =
+  const [{ data: obra }, { data: etapas }, { data: grupos }, { data: medicoes }, { data: cronograma }, { data: apropriacoes }, { data: realizadoMensal }, { data: pedidosEtapa }] =
     await Promise.all([
       supabase.from("obras").select("area_m2").eq("id", id).single(),
       supabase.from("v_etapa_resumo").select("etapa_id, nome, ordem, orcado, pago, a_pagar").eq("obra_id", id).order("ordem"),
@@ -19,6 +19,7 @@ export default async function Dashboard({ params, searchParams }: PageProps<"/ob
       supabase.from("v_cronograma_mensal").select("mes, previsto").eq("obra_id", id).order("mes"),
       supabase.from("v_apropriacao_resumo").select("nome, pago").eq("obra_id", id).gt("pago", 0).order("pago", { ascending: false }),
       supabase.from("v_realizado_mensal").select("mes, pago").eq("obra_id", id).order("mes"),
+      supabase.from("v_etapa_pedido").select("etapa_id, pedido").eq("obra_id", id),
     ]);
 
   const area = Number(obra?.area_m2 ?? 0);
@@ -39,6 +40,9 @@ export default async function Dashboard({ params, searchParams }: PageProps<"/ob
     (realizadoMensal ?? []).map((r) => ({ mes: r.mes as string, valor: Number(r.pago) })),
   );
   const listaEtapas = (etapas ?? []).map((e) => ({ nome: e.nome as string, orcado: Number(e.orcado), pago: Number(e.pago) }));
+
+  const pedidoDe = (etapaId: string | null) => Number(pedidosEtapa?.find((x) => x.etapa_id === etapaId)?.pedido ?? 0);
+  const totalPedido = (pedidosEtapa ?? []).reduce((s, x) => s + Number(x.pedido), 0);
 
   const somaApropriacoes = (apropriacoes ?? []).reduce((s, a) => s + Number(a.pago), 0);
   const somaGrupos = (grupos ?? []).reduce((s, g) => s + Number(g.pago), 0);
@@ -108,6 +112,7 @@ export default async function Dashboard({ params, searchParams }: PageProps<"/ob
             <tr>
               <th>Etapa</th>
               <th className="text-right">Orçado</th>
+              <th className="text-right">Pedido</th>
               <th className="text-right">Realizado</th>
               <th className="text-right">Diferença</th>
               <th className="w-40">Consumo</th>
@@ -121,6 +126,7 @@ export default async function Dashboard({ params, searchParams }: PageProps<"/ob
                 <tr key={e.etapa_id ?? "sem-etapa"}>
                   <td>{e.nome}</td>
                   <td className="text-right tabular-nums">{reais(o)}</td>
+                  <td className="text-right tabular-nums text-stone-600">{reais(pedidoDe(e.etapa_id))}</td>
                   <td className="text-right tabular-nums">{reais(p)}</td>
                   <td className={`text-right tabular-nums ${o - p < 0 ? "font-semibold text-red-600" : ""}`}>{reais(o - p)}</td>
                   <td>
@@ -142,6 +148,7 @@ export default async function Dashboard({ params, searchParams }: PageProps<"/ob
             <tr className="font-semibold">
               <td className="px-2 py-2">Total</td>
               <td className="px-2 text-right tabular-nums">{reais(orcado)}</td>
+              <td className="px-2 text-right tabular-nums">{reais(totalPedido)}</td>
               <td className="px-2 text-right tabular-nums">{reais(pago)}</td>
               <td className="px-2 text-right tabular-nums">{reais(orcado - pago)}</td>
               <td className="px-2 text-xs text-stone-500">{orcado ? porcento(pago / orcado) : ""}</td>

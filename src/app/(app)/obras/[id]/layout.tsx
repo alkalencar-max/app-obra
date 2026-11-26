@@ -10,7 +10,7 @@ export default async function LayoutObra({ children, params }: LayoutProps<"/obr
 
   return (
     <div className="space-y-4">
-      <div>
+      <div className="print:hidden">
         <h1 className="text-2xl font-bold">{obra.nome}</h1>
         <p className="text-sm text-stone-500">
           {obra.endereco} {obra.area_m2 ? `· ${Number(obra.area_m2).toLocaleString("pt-BR")} m²` : ""}
