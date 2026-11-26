@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { dataBr, reais } from "@/lib/formato";
 import { exigirEmpresa } from "@/lib/sessao";
-import { NovaCotacao } from "./nova-cotacao";
+import { NovaCotacao, type EtapaOrc } from "./nova-cotacao";
 
 type Cotacao = {
   id: string;
@@ -26,17 +26,29 @@ export default async function Compras({ params, searchParams }: PageProps<"/obra
   const { nova } = await searchParams;
   const { supabase } = await exigirEmpresa();
 
-  const [{ data }, { data: ultima }, { data: apropriacoes }, { data: grupos }, { data: fornecedores }] = await Promise.all([
+  const [{ data }, { data: ultima }, { data: apropriacoes }, { data: grupos }, { data: fornecedores }, { data: etapasOrc }] = await Promise.all([
     supabase
       .from("cotacoes")
       .select("id, numero, titulo, data, status, cotacao_propostas(id), pedidos(total, status, fornecedores(nome))")
       .eq("obra_id", id)
       .order("numero", { ascending: false }),
     supabase.from("cotacoes").select("numero").order("numero", { ascending: false }).limit(1).maybeSingle(),
-    supabase.from("apropriacoes").select("id, nome").eq("obra_id", id).order("nome"),
+    supabase.from("apropriacoes").select("id, nome, etapa_id").eq("obra_id", id).order("nome"),
     supabase.from("grupos").select("id, nome").order("ordem").order("nome"),
     supabase.from("fornecedores").select("nome").order("nome"),
+    supabase
+      .from("etapas")
+      .select("id, nome, orcamento_itens(id, descricao, quantidade, unidade, tipo, ordem)")
+      .eq("obra_id", id)
+      .order("ordem"),
   ]);
+  const orcamento: EtapaOrc[] = (etapasOrc ?? []).map((e) => ({
+    id: e.id,
+    nome: e.nome,
+    itens: ((e.orcamento_itens ?? []) as { id: string; descricao: string; quantidade: number; unidade: string | null; tipo: string; ordem: number }[])
+      .sort((a, b) => a.ordem - b.ordem)
+      .map((i) => ({ ...i, quantidade: Number(i.quantidade) })),
+  }));
   const cotacoes = (data ?? []) as unknown as Cotacao[];
   const abrirForm = nova !== undefined || cotacoes.length === 0;
 
@@ -49,6 +61,7 @@ export default async function Compras({ params, searchParams }: PageProps<"/obra
           apropriacoes={apropriacoes ?? []}
           grupos={grupos ?? []}
           fornecedores={(fornecedores ?? []).map((f) => f.nome)}
+          orcamento={orcamento}
         />
       ) : (
         <Link href={`/obras/${id}/compras?nova`} className="botao">+ Nova cotação</Link>

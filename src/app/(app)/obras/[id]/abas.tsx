@@ -7,9 +7,12 @@ export function Abas({ id }: { id: string }) {
   const caminho = usePathname();
   const abas = [
     { href: `/obras/${id}`, nome: "Dashboard" },
-    { href: `/obras/${id}/lancamentos`, nome: "Lançamentos" },
+    { href: `/obras/${id}/orcamento`, nome: "Orçamento" },
+    { href: `/obras/${id}/cronograma`, nome: "Cronograma" },
     { href: `/obras/${id}/compras`, nome: "Compras" },
     { href: `/obras/${id}/a-pagar`, nome: "A pagar" },
+    { href: `/obras/${id}/lancamentos`, nome: "Lançamentos" },
+    { href: `/obras/${id}/relatorio`, nome: "Relatório" },
     { href: `/obras/${id}/apropriacoes`, nome: "Etapas e apropriações" },
   ];
   return (
