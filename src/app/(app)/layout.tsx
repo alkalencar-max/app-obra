@@ -1,0 +1,29 @@
+import Link from "next/link";
+import { sair } from "@/app/login/acoes";
+import { exigirEmpresa } from "@/lib/sessao";
+
+export default async function LayoutApp({ children }: LayoutProps<"/">) {
+  const { empresaNome, email } = await exigirEmpresa();
+  return (
+    <div className="min-h-screen">
+      <header className="border-b border-stone-800 bg-stone-900 text-stone-100">
+        <div className="mx-auto flex max-w-6xl flex-wrap items-center gap-x-6 gap-y-2 px-4 py-3">
+          <Link href="/" className="font-bold text-amber-400">
+            App Obra
+          </Link>
+          <nav className="flex gap-4 text-sm">
+            <Link href="/" className="hover:text-amber-300">Obras</Link>
+            <Link href="/importar" className="hover:text-amber-300">Importar planilha</Link>
+          </nav>
+          <div className="ml-auto flex items-center gap-3 text-xs text-stone-400">
+            <span>{empresaNome} · {email}</span>
+            <form action={sair}>
+              <button className="rounded border border-stone-600 px-2 py-1 hover:bg-stone-800">Sair</button>
+            </form>
+          </div>
+        </div>
+      </header>
+      <main className="mx-auto max-w-6xl px-4 py-6">{children}</main>
+    </div>
+  );
+}
