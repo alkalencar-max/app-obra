@@ -11,6 +11,7 @@ type Linha = {
   descricao: string;
   obs: string | null;
   status: "pago" | "a_pagar";
+  comprovante_path: string | null;
   fornecedores: { nome: string } | null;
   apropriacoes: { nome: string } | null;
   grupos: { nome: string } | null;
@@ -31,7 +32,7 @@ export default async function Lancamentos({ params, searchParams }: PageProps<"/
 
   let consulta = supabase
     .from("lancamentos")
-    .select("id, data, valor, descricao, obs, status, fornecedores(nome), apropriacoes(nome), grupos(nome), medicoes(numero)")
+    .select("id, data, valor, descricao, obs, status, comprovante_path, fornecedores(nome), apropriacoes(nome), grupos(nome), medicoes(numero)")
     .eq("obra_id", id)
     .order("data", { ascending: false })
     .order("created_at", { ascending: false })
@@ -43,6 +44,13 @@ export default async function Lancamentos({ params, searchParams }: PageProps<"/
   const linhas = (data ?? []) as unknown as Linha[];
   const total = linhas.reduce((s, l) => s + Number(l.valor), 0);
   const ultimoBm = medicoes?.at(-1)?.numero ?? 1;
+
+  // Links temporários (1 h) para abrir os comprovantes guardados.
+  const caminhos = linhas.map((l) => l.comprovante_path).filter((c): c is string => !!c);
+  const { data: assinados } = caminhos.length
+    ? await supabase.storage.from("comprovantes").createSignedUrls(caminhos, 3600)
+    : { data: [] };
+  const linkComprovante = new Map((assinados ?? []).flatMap((a) => (a.path && a.signedUrl ? [[a.path, a.signedUrl] as const] : [])));
 
   return (
     <div className="space-y-6">
@@ -100,6 +108,11 @@ export default async function Lancamentos({ params, searchParams }: PageProps<"/
                 <td className="text-xs">{l.grupos?.nome}</td>
                 <td>{bm(l.medicoes?.numero)}</td>
                 <td className="whitespace-nowrap text-right">
+                  {l.comprovante_path && linkComprovante.get(l.comprovante_path) && (
+                    <a href={linkComprovante.get(l.comprovante_path)} target="_blank" rel="noreferrer" className="mr-2 text-xs text-amber-700 underline" title="Ver comprovante">
+                      📎 comprovante
+                    </a>
+                  )}
                   {l.status === "a_pagar" && (
                     <form action={marcarPago.bind(null, id)} className="inline">
                       <input type="hidden" name="id" value={l.id} />

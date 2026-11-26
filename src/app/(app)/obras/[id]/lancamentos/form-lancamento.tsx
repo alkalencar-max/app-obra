@@ -1,7 +1,25 @@
 "use client";
 
-import { useActionState, useEffect, useRef } from "react";
+import { useActionState, useEffect, useRef, useState, useTransition } from "react";
 import { salvarLancamento, type EstadoLancamento } from "../acoes";
+import { lerComprovante } from "../comprovante";
+
+// Reduz a foto no navegador (máx. 1800 px, JPEG) para subir rápido e caber no limite de envio.
+async function reduzirFoto(arquivo: File): Promise<File> {
+  if (!arquivo.type.startsWith("image/")) return arquivo;
+  try {
+    const bitmap = await createImageBitmap(arquivo);
+    const escala = Math.min(1, 1800 / Math.max(bitmap.width, bitmap.height));
+    const canvas = document.createElement("canvas");
+    canvas.width = Math.round(bitmap.width * escala);
+    canvas.height = Math.round(bitmap.height * escala);
+    canvas.getContext("2d")!.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+    const blob = await new Promise<Blob | null>((ok) => canvas.toBlob(ok, "image/jpeg", 0.82));
+    return blob ? new File([blob], "comprovante.jpg", { type: "image/jpeg" }) : arquivo;
+  } catch {
+    return arquivo;
+  }
+}
 
 type Opcao = { id: string; nome: string };
 
@@ -20,10 +38,39 @@ export function FormLancamento({
 }) {
   const [estado, acao, salvando] = useActionState<EstadoLancamento, FormData>(salvarLancamento.bind(null, obraId), {});
   const form = useRef<HTMLFormElement>(null);
+  const [comprovante, setComprovante] = useState<string | null>(null);
+  const [aviso, setAviso] = useState<{ tipo: "ok" | "erro"; texto: string } | null>(null);
+  const [lendo, iniciarLeitura] = useTransition();
+
+  function preencher(campo: string, valor: string | null | undefined) {
+    const el = form.current?.elements.namedItem(campo) as HTMLInputElement | null;
+    if (el && valor) el.value = valor;
+  }
+
+  function enviarComprovante(arquivo: File) {
+    setAviso(null);
+    iniciarLeitura(async () => {
+      const dados = new FormData();
+      dados.append("arquivo", await reduzirFoto(arquivo));
+      const r = await lerComprovante(obraId, dados);
+      if (r.caminho) setComprovante(r.caminho);
+      preencher("data", r.data);
+      preencher("valor", r.valor != null ? r.valor.toLocaleString("pt-BR", { minimumFractionDigits: 2, useGrouping: false }) : null);
+      preencher("fornecedor", r.favorecido?.toUpperCase());
+      preencher("descricao", r.descricao?.toUpperCase());
+      if (r.erro) setAviso({ tipo: "erro", texto: r.erro });
+      else {
+        setAviso({ tipo: "ok", texto: "Comprovante lido. Confira os valores, escolha a apropriação e clique em Lançar." });
+        (form.current?.elements.namedItem("apropriacao_id") as HTMLSelectElement | null)?.focus();
+      }
+    });
+  }
 
   // Depois de salvar, limpa o valor e a descrição e mantém o resto (data, BM, apropriação) para o próximo.
   useEffect(() => {
     if (!estado.ok || !form.current) return;
+    setComprovante(null);
+    setAviso(null);
     for (const campo of ["valor", "descricao", "obs"]) {
       const el = form.current.elements.namedItem(campo) as HTMLInputElement | null;
       if (el) el.value = "";
@@ -36,6 +83,27 @@ export function FormLancamento({
   return (
     <form ref={form} action={acao} className="cartao grid gap-3 sm:grid-cols-6">
       <h2 className="font-semibold sm:col-span-6">Novo lançamento</h2>
+      <div className="flex flex-wrap items-center gap-3 rounded-lg border-2 border-dashed border-amber-400 bg-amber-50 p-3 sm:col-span-6">
+        <label className={`botao cursor-pointer ${lendo ? "pointer-events-none opacity-50" : ""}`}>
+          {lendo ? "Lendo comprovante…" : "📎 Enviar comprovante"}
+          <input
+            type="file"
+            accept="image/*,application/pdf"
+            className="sr-only"
+            disabled={lendo}
+            onChange={(e) => {
+              const f = e.target.files?.[0];
+              if (f) enviarComprovante(f);
+              e.target.value = "";
+            }}
+          />
+        </label>
+        <span className="text-sm text-stone-600">
+          {comprovante ? "✓ Comprovante anexado a este lançamento." : "Foto ou PDF do PIX, boleto ou recibo: eu leio data, valor e favorecido, você só escolhe a apropriação."}
+        </span>
+        {aviso && <p className={`w-full text-sm ${aviso.tipo === "ok" ? "text-emerald-700" : "text-amber-700"}`}>{aviso.texto}</p>}
+        <input type="hidden" name="comprovante_path" value={comprovante ?? ""} />
+      </div>
       <div>
         <label className="rotulo" htmlFor="data">Data</label>
         <input className="campo" id="data" name="data" type="date" defaultValue={hoje} required />
