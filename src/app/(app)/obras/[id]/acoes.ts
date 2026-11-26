@@ -38,6 +38,10 @@ export async function salvarLancamento(obraId: string, _: EstadoLancamento, form
     medicaoId = data.id;
   }
 
+  // Só aceita comprovante guardado na pasta desta empresa e obra.
+  const caminho = txt(form, "comprovante_path");
+  const comprovante = caminho?.startsWith(`${empresaId}/${obraId}/`) ? caminho : null;
+
   const { error } = await supabase.from("lancamentos").insert({
     empresa_id: empresaId,
     obra_id: obraId,
@@ -50,6 +54,7 @@ export async function salvarLancamento(obraId: string, _: EstadoLancamento, form
     medicao_id: medicaoId,
     obs: txt(form, "obs"),
     status: form.get("status") === "a_pagar" ? "a_pagar" : "pago",
+    comprovante_path: comprovante,
   });
   if (error) return { erro: error.message };
   revalidatePath(`/obras/${obraId}`, "layout");
