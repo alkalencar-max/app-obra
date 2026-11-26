@@ -434,3 +434,23 @@ $$;
 
 revoke execute on function public.importar_obra(uuid, jsonb) from public, anon;
 grant execute on function public.importar_obra(uuid, jsonb) to authenticated;
+
+-- ===== supabase/migrations/20261126000003_permissoes.sql =====
+-- Permissões do usuário logado nas tabelas e visões. O RLS continua decidindo quais linhas ele vê;
+-- sem este grant o Postgres nega o acesso antes do RLS e o app fica preso no "Bem-vindo".
+grant usage on schema public to authenticated;
+grant select, insert, update, delete on all tables in schema public to authenticated;
+alter default privileges in schema public grant select, insert, update, delete on tables to authenticated;
+
+-- ===== supabase/migrations/20261126000004_realizado_mensal.sql =====
+-- Realizado (pago) por mês, para a curva previsto x realizado do dashboard.
+create view public.v_realizado_mensal with (security_invoker = true) as
+select
+  l.obra_id,
+  date_trunc('month', l.data)::date as mes,
+  sum(l.valor)::numeric(14, 2) as pago
+from public.lancamentos l
+where l.status = 'pago'
+group by l.obra_id, date_trunc('month', l.data);
+
+grant select on public.v_realizado_mensal to authenticated;
