@@ -7,7 +7,7 @@ import { exigirEmpresa } from "@/lib/sessao";
 
 export type Estado = { erro?: string };
 
-type ItemNovo = { descricao: string; quantidade: string; unidade: string };
+type ItemNovo = { descricao: string; quantidade: string; unidade: string; orcamento_item_id?: string };
 
 async function fornecedorPorNome(supabase: Awaited<ReturnType<typeof exigirEmpresa>>["supabase"], empresaId: string, nome: string) {
   const { data, error } = await supabase
@@ -34,7 +34,12 @@ export async function criarCotacao(obraId: string, _: Estado, form: FormData): P
     return { erro: "Não consegui ler os itens." };
   }
   const validos = itens
-    .map((i) => ({ descricao: i.descricao.trim().toUpperCase(), quantidade: valorBr(i.quantidade), unidade: i.unidade.trim().toUpperCase() || null }))
+    .map((i) => ({
+      descricao: i.descricao.trim().toUpperCase(),
+      quantidade: valorBr(i.quantidade),
+      unidade: i.unidade.trim().toUpperCase() || null,
+      orcamento_item_id: i.orcamento_item_id || null,
+    }))
     .filter((i) => i.descricao);
   if (validos.length === 0) return { erro: "Inclua pelo menos um item." };
   if (validos.some((i) => !(i.quantidade > 0))) return { erro: "Todo item precisa de quantidade maior que zero." };

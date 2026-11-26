@@ -1,11 +1,13 @@
 // Leitura de campos de formulário usados pelas server actions.
 export const txt = (form: FormData, campo: string) => String(form.get(campo) ?? "").trim() || null;
 
-// Aceita "1.234,56", "1234,56" e "1234.56".
+// Aceita "1.234,56", "1234,56", "1234.56" e "1.500" (ponto de milhar, como se digita no Brasil).
 export const valorBr = (s: string | null | undefined) => {
   if (!s) return NaN;
   const limpo = s.replace(/[^\d,.-]/g, "");
-  return Number(limpo.includes(",") ? limpo.replace(/\./g, "").replace(",", ".") : limpo);
+  if (limpo.includes(",")) return Number(limpo.replace(/\./g, "").replace(",", "."));
+  if (/^-?\d{1,3}(\.\d{3})+$/.test(limpo)) return Number(limpo.replace(/\./g, ""));
+  return Number(limpo);
 };
 
 // Data de hoje no fuso de Brasília, em "aaaa-mm-dd".

@@ -2,7 +2,7 @@
 
 import { useActionState, useMemo, useState } from "react";
 import { reais } from "@/lib/formato";
-import { dividirParcelas } from "@/lib/campos";
+import { dividirParcelas, valorBr } from "@/lib/campos";
 import { gerarPedido, salvarMapa, type Estado } from "../acoes";
 
 export type ItemMapa = { id: string; descricao: string; quantidade: number; unidade: string | null };
@@ -17,11 +17,10 @@ export type PropostaMapa = {
 };
 
 const num = (s: string) => {
-  const limpo = s.replace(/[^\d,.-]/g, "");
-  const v = Number(limpo.includes(",") ? limpo.replace(/\./g, "").replace(",", ".") : limpo);
+  const v = valorBr(s);
   return s.trim() && Number.isFinite(v) ? v : null;
 };
-const br = (v: number | null | undefined) => (v == null ? "" : v.toLocaleString("pt-BR", { maximumFractionDigits: 4 }));
+const br = (v: number | null | undefined) => (v == null ? "" : v.toLocaleString("pt-BR", { maximumFractionDigits: 4, useGrouping: false }));
 
 // Mapa de cotações: uma coluna por fornecedor, totais ao vivo e o menor total destacado.
 export function Mapa({ obraId, cotacaoId, itens, propostas, editavel }: { obraId: string; cotacaoId: string; itens: ItemMapa[]; propostas: PropostaMapa[]; editavel: boolean }) {
