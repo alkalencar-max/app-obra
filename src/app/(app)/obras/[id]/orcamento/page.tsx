@@ -23,7 +23,7 @@ export default async function Orcamento({ params }: PageProps<"/obras/[id]/orcam
   const lista = (itens ?? []) as Item[];
   const area = Number(obra?.area_m2 ?? 0);
   const total = (etapas ?? []).reduce((s, e) => s + Number(e.valor_orcado), 0);
-  const porTipo = TIPOS.map((t) => ({ ...t, valor: lista.filter((i) => i.tipo === t.valor).reduce((s, i) => s + Number(i.total), 0) }));
+  const porTipo = TIPOS.map((t) => ({ ...t, soma: lista.filter((i) => i.tipo === t.valor).reduce((s, i) => s + Number(i.total), 0) }));
 
   return (
     <div className="space-y-4">
@@ -39,8 +39,8 @@ export default async function Orcamento({ params }: PageProps<"/obras/[id]/orcam
         {porTipo.map((t) => (
           <div key={t.valor} className="cartao">
             <p className="text-xs text-stone-500">{t.nome}s</p>
-            <p className="text-lg font-bold tabular-nums">{reais(t.valor)}</p>
-            <p className="text-xs text-stone-500">{total ? porcento(t.valor / total) : ""}</p>
+            <p className="text-lg font-bold tabular-nums">{reais(t.soma)}</p>
+            <p className="text-xs text-stone-500">{total ? porcento(t.soma / total) : ""}</p>
           </div>
         ))}
       </section>

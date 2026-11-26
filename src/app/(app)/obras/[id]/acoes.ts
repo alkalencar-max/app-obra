@@ -63,9 +63,19 @@ export async function excluirLancamento(obraId: string, form: FormData) {
   revalidatePath(`/obras/${obraId}`, "layout");
 }
 
+// Ao pagar, grava a data do pagamento e, se o lançamento não tem BM, coloca na medição mais recente da obra.
 export async function marcarPago(obraId: string, form: FormData) {
   const { supabase } = await exigirEmpresa();
-  const { error } = await supabase.from("lancamentos").update({ status: "pago", data: hojeBr() }).eq("id", String(form.get("id"))).eq("obra_id", obraId);
+  const id = String(form.get("id"));
+  const [{ data: atual }, { data: ultimaBm }] = await Promise.all([
+    supabase.from("lancamentos").select("medicao_id").eq("id", id).single(),
+    supabase.from("medicoes").select("id").eq("obra_id", obraId).order("numero", { ascending: false }).limit(1).maybeSingle(),
+  ]);
+  const { error } = await supabase
+    .from("lancamentos")
+    .update({ status: "pago", data: hojeBr(), medicao_id: atual?.medicao_id ?? ultimaBm?.id ?? null })
+    .eq("id", id)
+    .eq("obra_id", obraId);
   if (error) throw new Error(error.message);
   revalidatePath(`/obras/${obraId}`, "layout");
 }
