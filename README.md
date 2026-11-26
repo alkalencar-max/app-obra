@@ -17,7 +17,7 @@ Cada empresa só enxerga os próprios dados (Row Level Security no banco).
 ### 1. Banco de dados (Supabase)
 
 1. Crie uma conta em [supabase.com](https://supabase.com) (dá para entrar com o GitHub) e um projeto novo. Região: São Paulo.
-2. No projeto, abra **SQL Editor**, cole o conteúdo de cada arquivo da pasta `supabase/migrations`, **na ordem do nome**, e clique em **Run**.
+2. No projeto, abra **SQL Editor**, cole todo o conteúdo de `supabase/instalar.sql` e clique em **Run**. (É a junção dos arquivos de `supabase/migrations`, na ordem.)
 3. Em **Authentication > URL Configuration**, coloque o endereço do site (ex.: `https://app-obra.vercel.app`) em **Site URL**.
 4. Em **Project Settings > API Keys**, copie a **Project URL** e a **Publishable key**.
 
