@@ -1,5 +1,7 @@
 import { bm, mesAno, porcento, reais } from "@/lib/formato";
 import { exigirEmpresa } from "@/lib/sessao";
+import { CurvaS, type PontoCurva } from "./curva-s";
+import { BarraInline, BarrasEtapas, COR, ColunasMedicao, Legenda } from "./graficos";
 
 const EMPREITEIRO = "SERVIÇOS EMPREITEIRO";
 
@@ -8,7 +10,7 @@ export default async function Dashboard({ params, searchParams }: PageProps<"/ob
   const { mes: mesParam } = await searchParams;
   const { supabase } = await exigirEmpresa();
 
-  const [{ data: obra }, { data: etapas }, { data: grupos }, { data: medicoes }, { data: cronograma }, { data: apropriacoes }] =
+  const [{ data: obra }, { data: etapas }, { data: grupos }, { data: medicoes }, { data: cronograma }, { data: apropriacoes }, { data: realizadoMensal }] =
     await Promise.all([
       supabase.from("obras").select("area_m2").eq("id", id).single(),
       supabase.from("v_etapa_resumo").select("etapa_id, nome, ordem, orcado, pago, a_pagar").eq("obra_id", id).order("ordem"),
@@ -16,6 +18,7 @@ export default async function Dashboard({ params, searchParams }: PageProps<"/ob
       supabase.from("v_medicao_resumo").select("numero, pago").eq("obra_id", id).order("numero"),
       supabase.from("v_cronograma_mensal").select("mes, previsto").eq("obra_id", id).order("mes"),
       supabase.from("v_apropriacao_resumo").select("nome, pago").eq("obra_id", id).gt("pago", 0).order("pago", { ascending: false }),
+      supabase.from("v_realizado_mensal").select("mes, pago").eq("obra_id", id).order("mes"),
     ]);
 
   const area = Number(obra?.area_m2 ?? 0);
@@ -30,6 +33,12 @@ export default async function Dashboard({ params, searchParams }: PageProps<"/ob
   const meses = (cronograma ?? []).map((c) => c.mes as string);
   const mesRef = typeof mesParam === "string" && meses.includes(mesParam) ? mesParam : hoje;
   const previsto = (cronograma ?? []).filter((c) => c.mes <= mesRef).reduce((s, c) => s + Number(c.previsto), 0);
+
+  const curva = montarCurva(
+    (cronograma ?? []).map((c) => ({ mes: c.mes as string, valor: Number(c.previsto) })),
+    (realizadoMensal ?? []).map((r) => ({ mes: r.mes as string, valor: Number(r.pago) })),
+  );
+  const listaEtapas = (etapas ?? []).map((e) => ({ nome: e.nome as string, orcado: Number(e.orcado), pago: Number(e.pago) }));
 
   const somaApropriacoes = (apropriacoes ?? []).reduce((s, a) => s + Number(a.pago), 0);
   const somaGrupos = (grupos ?? []).reduce((s, g) => s + Number(g.pago), 0);
@@ -65,9 +74,36 @@ export default async function Dashboard({ params, searchParams }: PageProps<"/ob
         </form>
       )}
 
-      <section className="cartao overflow-x-auto">
-        <h2 className="mb-2 font-semibold">Orçado x realizado por etapa</h2>
-        <table className="tabela">
+      {curva.length > 1 && (
+        <section className="cartao space-y-2">
+          <div className="flex flex-wrap items-baseline justify-between gap-2">
+            <h2 className="font-semibold">Previsto x realizado, acumulado mês a mês</h2>
+            <Legenda
+              itens={[
+                { cor: COR.previsto, nome: "Previsto (cronograma)", tracejado: true },
+                { cor: COR.realizado, nome: "Realizado (pago)" },
+              ]}
+            />
+          </div>
+          <CurvaS pontos={curva} />
+        </section>
+      )}
+
+      <section className="cartao space-y-3">
+        <div className="flex flex-wrap items-baseline justify-between gap-2">
+          <h2 className="font-semibold">Orçado x realizado por etapa</h2>
+          <Legenda
+            itens={[
+              { cor: COR.orcado, nome: "Orçado" },
+              { cor: COR.realizado, nome: "Realizado" },
+              { cor: COR.estouro, nome: "Acima do orçado" },
+            ]}
+          />
+        </div>
+        <BarrasEtapas etapas={listaEtapas} />
+        <details className="overflow-x-auto">
+          <summary className="cursor-pointer text-sm text-stone-600">Ver tabela</summary>
+        <table className="tabela mt-2">
           <thead>
             <tr>
               <th>Etapa</th>
@@ -112,12 +148,15 @@ export default async function Dashboard({ params, searchParams }: PageProps<"/ob
             </tr>
           </tfoot>
         </table>
+        </details>
       </section>
 
       <div className="grid gap-6 lg:grid-cols-2">
         <Resumo titulo="Gasto por grupo" linhas={(grupos ?? []).map((g) => ({ nome: g.grupo, valor: Number(g.pago) }))} total={pago} area={area} />
         <Resumo titulo="Gasto por apropriação" linhas={(apropriacoes ?? []).map((a) => ({ nome: a.nome, valor: Number(a.pago) }))} total={pago} area={area} />
-        <Resumo titulo="Valor por medição" linhas={(medicoes ?? []).map((m) => ({ nome: bm(m.numero), valor: Number(m.pago) }))} total={pago} area={area} />
+        <Resumo titulo="Valor por medição" linhas={(medicoes ?? []).map((m) => ({ nome: bm(m.numero), valor: Number(m.pago) }))} total={pago} area={area}>
+          {(medicoes ?? []).length > 1 && <ColunasMedicao medicoes={(medicoes ?? []).map((m) => ({ nome: bm(m.numero), valor: Number(m.pago) }))} />}
+        </Resumo>
         <section className="cartao">
           <h2 className="mb-2 font-semibold">Prova real</h2>
           <ul className="space-y-1 text-sm">
@@ -144,10 +183,24 @@ function Indicador({ rotulo, valor, destaque, cor }: { rotulo: string; valor: st
   );
 }
 
-function Resumo({ titulo, linhas, total, area }: { titulo: string; linhas: { nome: string; valor: number }[]; total: number; area: number }) {
+function Resumo({
+  titulo,
+  linhas,
+  total,
+  area,
+  children,
+}: {
+  titulo: string;
+  linhas: { nome: string; valor: number }[];
+  total: number;
+  area: number;
+  children?: React.ReactNode;
+}) {
+  const max = Math.max(0, ...linhas.map((l) => l.valor));
   return (
     <section className="cartao overflow-x-auto">
       <h2 className="mb-2 font-semibold">{titulo}</h2>
+      {children}
       <table className="tabela">
         <thead>
           <tr>
@@ -155,6 +208,7 @@ function Resumo({ titulo, linhas, total, area }: { titulo: string; linhas: { nom
             <th className="text-right">R$</th>
             <th className="text-right">R$/m²</th>
             <th className="text-right">%</th>
+            <th className="w-24"></th>
           </tr>
         </thead>
         <tbody>
@@ -164,6 +218,9 @@ function Resumo({ titulo, linhas, total, area }: { titulo: string; linhas: { nom
               <td className="text-right tabular-nums">{reais(l.valor)}</td>
               <td className="text-right tabular-nums">{area ? reais(l.valor / area) : ""}</td>
               <td className="text-right tabular-nums">{total ? porcento(l.valor / total) : ""}</td>
+              <td>
+                <BarraInline valor={l.valor} max={max} />
+              </td>
             </tr>
           ))}
         </tbody>
@@ -182,4 +239,29 @@ function Conferencia({ nome, valor, esperado }: { nome: string; valor: number; e
       </span>
     </li>
   );
+}
+
+// Junta cronograma (previsto por mês) e realizado por mês numa série acumulada contínua.
+// O realizado vai até o último mês com pagamento; depois disso só o previsto segue.
+function montarCurva(previsto: { mes: string; valor: number }[], realizado: { mes: string; valor: number }[]): PontoCurva[] {
+  const todos = [...previsto, ...realizado].map((p) => p.mes.slice(0, 7)).sort();
+  if (todos.length === 0) return [];
+  const ultimoRealizado = realizado.map((r) => r.mes.slice(0, 7)).sort().at(-1);
+  const soma = (lista: { mes: string; valor: number }[], m: string) =>
+    lista.filter((p) => p.mes.slice(0, 7) === m).reduce((s, p) => s + p.valor, 0);
+
+  const pontos: PontoCurva[] = [];
+  let [ano, mes] = todos[0].split("-").map(Number);
+  const fim = todos.at(-1)!;
+  let accP = 0, accR = 0;
+  for (;;) {
+    const m = `${ano}-${String(mes).padStart(2, "0")}`;
+    accP += soma(previsto, m);
+    accR += soma(realizado, m);
+    pontos.push({ mes: `${m}-01`, previsto: accP, realizado: ultimoRealizado && m <= ultimoRealizado ? accR : null });
+    if (m >= fim || pontos.length > 240) break;
+    mes += 1;
+    if (mes > 12) { mes = 1; ano += 1; }
+  }
+  return pontos;
 }
