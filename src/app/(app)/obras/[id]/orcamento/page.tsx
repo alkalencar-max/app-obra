@@ -1,6 +1,6 @@
 import { porcento, reais } from "@/lib/formato";
 import { exigirEmpresa } from "@/lib/sessao";
-import { excluirItem, salvarItem } from "./acoes";
+import { excluirItem, novaEtapa, salvarItem } from "./acoes";
 import { ImportarOrcamento } from "./importar-orcamento";
 
 type Item = { id: string; etapa_id: string; descricao: string; tipo: string; quantidade: number; unidade: string | null; custo_unitario: number; total: number };
@@ -50,9 +50,9 @@ export default async function Orcamento({ params }: PageProps<"/obras/[id]/orcam
       {(etapas ?? []).map((e) => {
         const doEtapa = lista.filter((i) => i.etapa_id === e.id);
         return (
-          <details key={e.id} className="cartao">
+          <details key={e.id} className="cartao group" open>
             <summary className="flex cursor-pointer flex-wrap items-baseline justify-between gap-2">
-              <span className="font-semibold">{e.nome}</span>
+              <span className="font-semibold"><span className="mr-1 inline-block text-stone-400 transition group-open:rotate-90">▸</span>{e.nome}</span>
               <span className="text-sm tabular-nums">
                 {reais(e.valor_orcado)}
                 <span className="ml-2 text-xs text-stone-500">{doEtapa.length} itens{total ? ` · ${porcento(Number(e.valor_orcado) / total)}` : ""}</span>
@@ -97,7 +97,7 @@ export default async function Orcamento({ params }: PageProps<"/obras/[id]/orcam
                     <td colSpan={7} className="p-0">
                       <form action={salvarItem.bind(null, id)} className="grid grid-cols-[1fr_7rem_5rem_4rem_6.5rem_7rem_5.5rem] items-center gap-1 bg-stone-50 px-2 py-1">
                         <input type="hidden" name="etapa_id" value={e.id} />
-                        <input className="campo py-1" name="descricao" placeholder="+ novo item" aria-label="Descrição do novo item" />
+                        <input className="campo py-1" name="descricao" placeholder="Novo item: descrição (ex.: Cimento 50kg)" aria-label="Descrição do novo item" />
                         <select className="campo py-1 text-xs" name="tipo" defaultValue="material" aria-label="Tipo">
                           {TIPOS.map((t) => <option key={t.valor} value={t.valor}>{nomeTipo(t.valor)}</option>)}
                         </select>
@@ -105,7 +105,7 @@ export default async function Orcamento({ params }: PageProps<"/obras/[id]/orcam
                         <input className="campo py-1" name="unidade" placeholder="un" aria-label="Unidade" />
                         <input className="campo py-1 text-right" name="custo_unitario" placeholder="R$" aria-label="Custo unitário" />
                         <span />
-                        <button className="botao-secundario py-1 text-xs">incluir</button>
+                        <button className="botao py-1 text-xs">+ incluir item</button>
                       </form>
                     </td>
                   </tr>
@@ -115,7 +115,15 @@ export default async function Orcamento({ params }: PageProps<"/obras/[id]/orcam
           </details>
         );
       })}
-      {(etapas ?? []).length === 0 && <p className="cartao text-sm text-stone-600">Esta obra ainda não tem etapas. Importe o orçamento acima ou cadastre as etapas na aba Etapas e apropriações.</p>}
+      <form action={novaEtapa.bind(null, id)} className="cartao flex flex-wrap items-end gap-2 border-dashed">
+        <div className="min-w-56 flex-1">
+          <label className="rotulo" htmlFor="nova-etapa">Nova etapa</label>
+          <input className="campo" id="nova-etapa" name="nome" placeholder="ex.: FUNDAÇÃO, ALVENARIA, COBERTURA" required />
+        </div>
+        <button className="botao">+ Criar etapa</button>
+        <p className="w-full text-xs text-stone-500">Depois de criar, inclua os materiais, serviços e equipamentos dentro dela.</p>
+      </form>
+      {(etapas ?? []).length === 0 && <p className="cartao text-sm text-stone-600">Esta obra ainda não tem etapas. Crie a primeira acima ou importe a planilha de orçamento.</p>}
     </div>
   );
 }

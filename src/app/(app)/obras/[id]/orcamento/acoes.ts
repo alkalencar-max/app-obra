@@ -49,3 +49,22 @@ export async function excluirItem(obraId: string, form: FormData) {
   if (error) throw new Error(error.message);
   revalidatePath(`/obras/${obraId}`, "layout");
 }
+
+// Cria a etapa no orçamento e uma apropriação com o mesmo nome, já ligada a ela (para lançar e cotar).
+export async function novaEtapa(obraId: string, form: FormData) {
+  const { supabase, empresaId } = await exigirEmpresa();
+  const nome = txt(form, "nome")?.toUpperCase();
+  if (!nome) throw new Error("Informe o nome da etapa.");
+  const { data: ultima } = await supabase.from("etapas").select("ordem").eq("obra_id", obraId).order("ordem", { ascending: false }).limit(1).maybeSingle();
+  const { data: etapa, error } = await supabase
+    .from("etapas")
+    .insert({ empresa_id: empresaId, obra_id: obraId, nome, ordem: (ultima?.ordem ?? 0) + 1 })
+    .select("id")
+    .single();
+  if (error) throw new Error(error.code === "23505" ? "Já existe uma etapa com esse nome." : error.message);
+  await supabase.from("apropriacoes").upsert(
+    { empresa_id: empresaId, obra_id: obraId, nome, etapa_id: etapa.id },
+    { onConflict: "obra_id,nome", ignoreDuplicates: true },
+  );
+  revalidatePath(`/obras/${obraId}`, "layout");
+}
