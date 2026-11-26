@@ -2,7 +2,7 @@ import { bm, dataBr, mesAno, porcento, reais } from "@/lib/formato";
 import { exigirEmpresa } from "@/lib/sessao";
 import { BotaoImprimir } from "./compras/[cot]/imprimir";
 import { CurvaS, type PontoCurva } from "./curva-s";
-import { BarraInline, BarrasEtapas, COR, ColunasMedicao, Legenda } from "./graficos";
+import { BarraInline, BarrasEtapas, COR, ColunasMedicao, Legenda, Pizza } from "./graficos";
 
 const EMPREITEIRO = "SERVIÇOS EMPREITEIRO";
 
@@ -44,6 +44,9 @@ export default async function Dashboard({ params, searchParams }: PageProps<"/ob
 
   const pedidoDe = (etapaId: string | null) => Number(pedidosEtapa?.find((x) => x.etapa_id === etapaId)?.pedido ?? 0);
   const totalPedido = (pedidosEtapa ?? []).reduce((s, x) => s + Number(x.pedido), 0);
+
+  const linhasGrupo = (grupos ?? []).map((g) => ({ nome: g.grupo as string, valor: Number(g.pago) }));
+  const linhasApropriacao = (apropriacoes ?? []).map((a) => ({ nome: a.nome as string, valor: Number(a.pago) }));
 
   const somaApropriacoes = (apropriacoes ?? []).reduce((s, a) => s + Number(a.pago), 0);
   const somaGrupos = (grupos ?? []).reduce((s, g) => s + Number(g.pago), 0);
@@ -109,21 +112,25 @@ export default async function Dashboard({ params, searchParams }: PageProps<"/ob
           {obra?.endereco} {area ? `· ${area.toLocaleString("pt-BR")} m²` : ""} · cronograma até {mesAno(mesRef)} · emitido em {dataBr(new Date().toISOString())}
         </p>
       </div>
-      <section className="grid grid-cols-2 gap-3 md:grid-cols-4 print:grid-cols-4 print:gap-2">
-        <Indicador rotulo={`Medição atual ${bm(ultimaMedicao?.numero)}`} valor={reais(ultimaMedicao?.pago)} />
-        <Indicador rotulo="Total realizado (pago)" valor={reais(pago)} destaque />
-        <Indicador rotulo="Preço por m²" valor={area ? reais(pago / area) : "informe a área"} />
-        <Indicador rotulo="Pago ao empreiteiro" valor={reais(empreiteiro)} />
-        <Indicador rotulo="Orçamento global" valor={reais(orcado)} />
-        <Indicador rotulo="Saldo do orçamento" valor={reais(orcado - pago)} />
-        <Indicador rotulo={`Previsto no cronograma até ${mesAno(mesRef)}`} valor={reais(previsto)} />
-        <Indicador
-          rotulo="Divergência realizado x previsto"
-          valor={reais(pago - previsto)}
-          cor={pago - previsto > 0 ? "text-red-600" : "text-emerald-700"}
-        />
+      <section className="cartao">
+        <h2>Indicadores da obra</h2>
+        <div className="grid grid-cols-2 gap-3 md:grid-cols-4 print:grid-cols-4 print:gap-2">
+          <Indicador rotulo={`Medição atual ${bm(ultimaMedicao?.numero)}`} valor={reais(ultimaMedicao?.pago)} tom="azul" />
+          <Indicador rotulo="Total realizado (pago)" valor={reais(pago)} tom="azul" destaque />
+          <Indicador rotulo="Preço por m²" valor={area ? reais(pago / area) : "informe a área"} tom="verde" />
+          <Indicador rotulo="Pago ao empreiteiro" valor={reais(empreiteiro)} tom="verde" />
+          <Indicador rotulo="Orçamento global" valor={reais(orcado)} tom="cinza" />
+          <Indicador rotulo="Saldo do orçamento" valor={reais(orcado - pago)} tom="cinza" cor={orcado - pago < 0 ? "text-red-600" : undefined} />
+          <Indicador rotulo={`Previsto no cronograma até ${mesAno(mesRef)}`} valor={reais(previsto)} tom="laranja" />
+          <Indicador
+            rotulo="Divergência realizado x previsto"
+            valor={reais(pago - previsto)}
+            tom={pago - previsto > 0 ? "vermelho" : "verde"}
+            cor={pago - previsto > 0 ? "text-red-600" : "text-emerald-700"}
+          />
+        </div>
+        {aPagar > 0 && <p className="mt-3 text-sm text-stone-600">Além do realizado, há {reais(aPagar)} lançados como a pagar.</p>}
       </section>
-      {aPagar > 0 && <p className="text-sm text-stone-600">Além do realizado, há {reais(aPagar)} lançados como a pagar.</p>}
 
       <div className="flex flex-wrap items-end justify-between gap-3 print:hidden">
       {meses.length > 0 ? (
@@ -140,9 +147,9 @@ export default async function Dashboard({ params, searchParams }: PageProps<"/ob
       </div>
 
       {curva.length > 1 && (
-        <section className="cartao space-y-2">
-          <div className="flex flex-wrap items-baseline justify-between gap-2">
-            <h2 className="font-semibold">Previsto x realizado, acumulado mês a mês</h2>
+        <section className="cartao">
+          <div className="cartao-cab">
+            <h2>Curva S: previsto x realizado acumulado</h2>
             <Legenda
               itens={[
                 { cor: COR.previsto, nome: "Previsto (cronograma)", tracejado: true },
@@ -154,9 +161,9 @@ export default async function Dashboard({ params, searchParams }: PageProps<"/ob
         </section>
       )}
 
-      <section className="cartao space-y-3">
-        <div className="flex flex-wrap items-baseline justify-between gap-2">
-          <h2 className="font-semibold">Orçado x realizado por etapa</h2>
+      <section className="cartao space-y-3 print:break-inside-auto">
+        <div className="cartao-cab">
+          <h2>Orçado x realizado por etapa</h2>
           <Legenda
             itens={[
               { cor: COR.orcado, nome: "Orçado" },
@@ -174,14 +181,18 @@ export default async function Dashboard({ params, searchParams }: PageProps<"/ob
         <div className="hidden print:block">{tabelaEtapas}</div>
       </section>
 
-      <div className="grid gap-6 lg:grid-cols-2 print:gap-4">
-        <Resumo titulo="Gasto por grupo" linhas={(grupos ?? []).map((g) => ({ nome: g.grupo, valor: Number(g.pago) }))} total={pago} area={area} />
-        <Resumo titulo="Gasto por apropriação" linhas={(apropriacoes ?? []).map((a) => ({ nome: a.nome, valor: Number(a.pago) }))} total={pago} area={area} />
+      <div className="grid gap-6 lg:grid-cols-2 print:break-before-page print:grid-cols-2 print:gap-3">
+        <Resumo titulo="Gasto por grupo" linhas={linhasGrupo} total={pago} area={area}>
+          <Pizza linhas={linhasGrupo} />
+        </Resumo>
+        <Resumo titulo="Gasto por apropriação" linhas={linhasApropriacao} total={pago} area={area}>
+          <Pizza linhas={linhasApropriacao} />
+        </Resumo>
         <Resumo titulo="Valor por medição" linhas={(medicoes ?? []).map((m) => ({ nome: bm(m.numero), valor: Number(m.pago) }))} total={pago} area={area}>
           {(medicoes ?? []).length > 1 && <ColunasMedicao medicoes={(medicoes ?? []).map((m) => ({ nome: bm(m.numero), valor: Number(m.pago) }))} />}
         </Resumo>
         <section className="cartao">
-          <h2 className="mb-2 font-semibold">Prova real</h2>
+          <h2>Prova real (conferência dos totais)</h2>
           <ul className="space-y-1 text-sm">
             <Conferencia nome="Lançamentos (por apropriação)" valor={somaApropriacoes} esperado={somaApropriacoes} />
             <Conferencia nome="Soma por etapas" valor={pago} esperado={somaApropriacoes} />
@@ -197,10 +208,18 @@ export default async function Dashboard({ params, searchParams }: PageProps<"/ob
   );
 }
 
-function Indicador({ rotulo, valor, destaque, cor }: { rotulo: string; valor: string; destaque?: boolean; cor?: string }) {
+const TONS = {
+  azul: "border-l-[#257de0]",
+  laranja: "border-l-[#f47230]",
+  verde: "border-l-[#00b894]",
+  cinza: "border-l-stone-400",
+  vermelho: "border-l-red-600",
+};
+
+function Indicador({ rotulo, valor, destaque, cor, tom }: { rotulo: string; valor: string; destaque?: boolean; cor?: string; tom: keyof typeof TONS }) {
   return (
-    <div className={`cartao ${destaque ? "border-amber-400 bg-amber-50" : ""}`}>
-      <p className="text-xs text-stone-500">{rotulo}</p>
+    <div className={`rounded-lg border border-l-4 border-stone-200 px-3 py-2 ${TONS[tom]} ${destaque ? "bg-blue-50" : "bg-stone-50"}`}>
+      <p className="text-xs text-stone-600">{rotulo}</p>
       <p className={`text-lg font-bold tabular-nums ${cor ?? ""}`}>{valor}</p>
     </div>
   );
@@ -222,16 +241,16 @@ function Resumo({
   const max = Math.max(0, ...linhas.map((l) => l.valor));
   return (
     <section className="cartao overflow-x-auto">
-      <h2 className="mb-2 font-semibold">{titulo}</h2>
+      <h2>{titulo}</h2>
       {children}
-      <table className="tabela">
+      <table className="tabela print:text-[10px]">
         <thead>
           <tr>
             <th></th>
             <th className="text-right">R$</th>
             <th className="text-right">R$/m²</th>
             <th className="text-right">%</th>
-            <th className="w-24"></th>
+            <th className="w-24 print:hidden"></th>
           </tr>
         </thead>
         <tbody>
@@ -241,7 +260,7 @@ function Resumo({
               <td className="text-right tabular-nums">{reais(l.valor)}</td>
               <td className="text-right tabular-nums">{area ? reais(l.valor / area) : ""}</td>
               <td className="text-right tabular-nums">{total ? porcento(l.valor / total) : ""}</td>
-              <td>
+              <td className="print:hidden">
                 <BarraInline valor={l.valor} max={max} />
               </td>
             </tr>

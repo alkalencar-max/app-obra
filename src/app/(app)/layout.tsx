@@ -6,7 +6,7 @@ export default async function LayoutApp({ children }: LayoutProps<"/">) {
   const { empresaNome, email } = await exigirEmpresa();
   return (
     <div className="min-h-screen">
-      <header className="print:hidden border-b border-stone-800 bg-stone-900 pt-[env(safe-area-inset-top)] text-stone-100">
+      <header className="print:hidden border-b-4 border-amber-500 bg-stone-900 pt-[env(safe-area-inset-top)] text-stone-100">
         <div className="mx-auto flex max-w-6xl flex-wrap items-center gap-x-6 gap-y-2 py-3 pl-[max(1rem,env(safe-area-inset-left))] pr-[max(1rem,env(safe-area-inset-right))]">
           <Link href="/" className="font-bold text-amber-400">
             App Obra
