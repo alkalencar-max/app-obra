@@ -1,7 +1,8 @@
 import { porcento, reais } from "@/lib/formato";
 import { exigirEmpresa } from "@/lib/sessao";
-import { excluirItem, novaEtapa, salvarItem } from "./acoes";
+import { excluirItem, salvarItem } from "./acoes";
 import { ImportarOrcamento } from "./importar-orcamento";
+import { NovaEtapa } from "./nova-etapa";
 
 type Item = { id: string; etapa_id: string; descricao: string; tipo: string; quantidade: number; unidade: string | null; custo_unitario: number; total: number };
 
@@ -50,7 +51,7 @@ export default async function Orcamento({ params }: PageProps<"/obras/[id]/orcam
       {(etapas ?? []).map((e) => {
         const doEtapa = lista.filter((i) => i.etapa_id === e.id);
         return (
-          <details key={e.id} className="cartao group" open>
+          <details key={e.id} id={`etapa-${e.id}`} className="cartao group scroll-mt-4" open>
             <summary className="flex cursor-pointer flex-wrap items-baseline justify-between gap-2">
               <span className="font-semibold"><span className="mr-1 inline-block text-stone-400 transition group-open:rotate-90">▸</span>{e.nome}</span>
               <span className="text-sm tabular-nums">
@@ -115,14 +116,7 @@ export default async function Orcamento({ params }: PageProps<"/obras/[id]/orcam
           </details>
         );
       })}
-      <form action={novaEtapa.bind(null, id)} className="cartao flex flex-wrap items-end gap-2 border-dashed">
-        <div className="min-w-56 flex-1">
-          <label className="rotulo" htmlFor="nova-etapa">Nova etapa</label>
-          <input className="campo" id="nova-etapa" name="nome" placeholder="ex.: FUNDAÇÃO, ALVENARIA, COBERTURA" required />
-        </div>
-        <button className="botao">+ Criar etapa</button>
-        <p className="w-full text-xs text-stone-500">Depois de criar, inclua os materiais, serviços e equipamentos dentro dela.</p>
-      </form>
+      <NovaEtapa obraId={id} />
       {(etapas ?? []).length === 0 && <p className="cartao text-sm text-stone-600">Esta obra ainda não tem etapas. Crie a primeira acima ou importe a planilha de orçamento.</p>}
     </div>
   );
