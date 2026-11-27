@@ -86,14 +86,17 @@ async function prepararImagem(imagem: File | HTMLCanvasElement): Promise<HTMLCan
   return canvas;
 }
 
+// Um só leitor por página: carregar o OCR demora, então ele fica pronto para os próximos comprovantes.
+let leitor: Promise<import("tesseract.js").Worker> | null = null;
+
 async function ocr(imagem: File | HTMLCanvasElement): Promise<string> {
-  const { createWorker } = await import("tesseract.js");
-  const worker = await createWorker("por");
+  if (!leitor) leitor = import("tesseract.js").then(({ createWorker }) => createWorker("por"));
   try {
-    const { data } = await worker.recognize(await prepararImagem(imagem));
+    const { data } = await (await leitor).recognize(await prepararImagem(imagem));
     return data.text;
-  } finally {
-    await worker.terminate();
+  } catch (e) {
+    leitor = null;
+    throw e;
   }
 }
 
@@ -107,4 +110,21 @@ export async function lerComprovanteLocal(arquivo: File): Promise<Extraido> {
     texto = await ocr(arquivo);
   }
   return extrairComprovante(texto);
+}
+
+// Reduz a foto no navegador (máx. 1800 px, JPEG) para subir rápido e caber no limite de envio.
+export async function reduzirFoto(arquivo: File): Promise<File> {
+  if (!arquivo.type.startsWith("image/")) return arquivo;
+  try {
+    const bitmap = await createImageBitmap(arquivo);
+    const escala = Math.min(1, 1800 / Math.max(bitmap.width, bitmap.height));
+    const canvas = document.createElement("canvas");
+    canvas.width = Math.round(bitmap.width * escala);
+    canvas.height = Math.round(bitmap.height * escala);
+    canvas.getContext("2d")!.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+    const blob = await new Promise<Blob | null>((ok) => canvas.toBlob(ok, "image/jpeg", 0.82));
+    return blob ? new File([blob], "comprovante.jpg", { type: "image/jpeg" }) : arquivo;
+  } catch {
+    return arquivo;
+  }
 }

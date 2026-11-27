@@ -3,6 +3,7 @@ import { bm, dataBr, reais } from "@/lib/formato";
 import { exigirEmpresa } from "@/lib/sessao";
 import { excluirLancamento, marcarPago } from "../acoes";
 import { FormLancamento } from "./form-lancamento";
+import { LoteComprovantes } from "./lote-comprovantes";
 
 type Linha = {
   id: string;
@@ -61,6 +62,8 @@ export default async function Lancamentos({ params, searchParams }: PageProps<"/
         fornecedores={(fornecedores ?? []).map((f) => f.nome)}
         medicaoPadrao={ultimoBm}
       />
+
+      <LoteComprovantes obraId={id} apropriacoes={apropriacoes ?? []} grupos={grupos ?? []} medicaoPadrao={ultimoBm} />
 
       <section className="cartao overflow-x-auto">
         <form className="mb-3 flex flex-wrap items-end gap-2">
