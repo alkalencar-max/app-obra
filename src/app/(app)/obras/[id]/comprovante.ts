@@ -5,6 +5,8 @@ import { exigirEmpresa } from "@/lib/sessao";
 
 export type LeituraComprovante = {
   erro?: string;
+  // true quando não há chave da IA: o navegador faz a leitura grátis (OCR).
+  semIA?: boolean;
   caminho?: string;
   data?: string | null;
   valor?: number | null;
@@ -31,7 +33,8 @@ const ESQUEMA = {
   additionalProperties: false,
 } as const;
 
-// Guarda o comprovante no Storage e lê data, valor e favorecido com o Claude.
+// Guarda o comprovante no Storage e, se houver chave da IA, lê data, valor e favorecido com o Claude.
+// Sem chave, devolve semIA e a leitura é feita de graça no navegador.
 export async function lerComprovante(obraId: string, form: FormData): Promise<LeituraComprovante> {
   const { supabase, empresaId } = await exigirEmpresa();
   const arquivo = form.get("arquivo");
@@ -46,7 +49,7 @@ export async function lerComprovante(obraId: string, form: FormData): Promise<Le
   if (erroUpload) return { erro: `Não consegui guardar o arquivo: ${erroUpload.message}` };
 
   if (!process.env.ANTHROPIC_API_KEY) {
-    return { caminho, erro: "Comprovante guardado, mas a leitura automática ainda não está ligada. Preencha os campos à mão." };
+    return { caminho, semIA: true };
   }
 
   const anexo: Anthropic.Beta.BetaContentBlockParam = ehPdf
