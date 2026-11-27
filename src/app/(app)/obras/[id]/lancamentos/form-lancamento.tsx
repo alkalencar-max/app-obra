@@ -3,6 +3,7 @@
 import { useActionState, useEffect, useRef, useState, useTransition } from "react";
 import { salvarLancamento, type EstadoLancamento } from "../acoes";
 import { lerComprovante } from "../comprovante";
+import { lerComprovanteLocal } from "@/lib/ler-comprovante-local";
 
 // Reduz a foto no navegador (máx. 1800 px, JPEG) para subir rápido e caber no limite de envio.
 async function reduzirFoto(arquivo: File): Promise<File> {
@@ -52,15 +53,30 @@ export function FormLancamento({
     iniciarLeitura(async () => {
       const dados = new FormData();
       dados.append("arquivo", await reduzirFoto(arquivo));
-      const r = await lerComprovante(obraId, dados);
+      let r = await lerComprovante(obraId, dados);
       if (r.caminho) setComprovante(r.caminho);
+      if (r.semIA) {
+        // Leitura grátis no navegador (OCR).
+        try {
+          const lido = await lerComprovanteLocal(arquivo);
+          const achou = lido.valor != null || lido.data != null || lido.favorecido != null;
+          r = { ...r, ...lido, erro: achou ? undefined : "Comprovante guardado, mas não consegui ler os dados. Preencha os campos à mão." };
+        } catch (e) {
+          console.error("lerComprovanteLocal", e);
+          r = { ...r, erro: "Comprovante guardado, mas a leitura falhou. Preencha os campos à mão." };
+        }
+      }
       preencher("data", r.data);
       preencher("valor", r.valor != null ? r.valor.toLocaleString("pt-BR", { minimumFractionDigits: 2, useGrouping: false }) : null);
       preencher("fornecedor", r.favorecido?.toUpperCase());
       preencher("descricao", r.descricao?.toUpperCase());
       if (r.erro) setAviso({ tipo: "erro", texto: r.erro });
       else {
-        setAviso({ tipo: "ok", texto: "Comprovante lido. Confira os valores, escolha a apropriação e clique em Lançar." });
+        const faltou = [r.data ? null : "data", r.valor != null ? null : "valor", r.favorecido ? null : "favorecido"].filter(Boolean);
+        setAviso({
+          tipo: "ok",
+          texto: `Comprovante lido. Confira os valores${faltou.length ? ` (não achei: ${faltou.join(", ")})` : ""}, escolha a apropriação e clique em Lançar.`,
+        });
         (form.current?.elements.namedItem("apropriacao_id") as HTMLSelectElement | null)?.focus();
       }
     });
