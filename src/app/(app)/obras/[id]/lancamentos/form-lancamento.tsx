@@ -2,25 +2,7 @@
 
 import { useActionState, useEffect, useRef, useState, useTransition } from "react";
 import { salvarLancamento, type EstadoLancamento } from "../acoes";
-import { lerComprovante } from "../comprovante";
-import { lerComprovanteLocal } from "@/lib/ler-comprovante-local";
-
-// Reduz a foto no navegador (máx. 1800 px, JPEG) para subir rápido e caber no limite de envio.
-async function reduzirFoto(arquivo: File): Promise<File> {
-  if (!arquivo.type.startsWith("image/")) return arquivo;
-  try {
-    const bitmap = await createImageBitmap(arquivo);
-    const escala = Math.min(1, 1800 / Math.max(bitmap.width, bitmap.height));
-    const canvas = document.createElement("canvas");
-    canvas.width = Math.round(bitmap.width * escala);
-    canvas.height = Math.round(bitmap.height * escala);
-    canvas.getContext("2d")!.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
-    const blob = await new Promise<Blob | null>((ok) => canvas.toBlob(ok, "image/jpeg", 0.82));
-    return blob ? new File([blob], "comprovante.jpg", { type: "image/jpeg" }) : arquivo;
-  } catch {
-    return arquivo;
-  }
-}
+import { lerArquivo, valorBrTexto } from "./ler";
 
 type Opcao = { id: string; nome: string };
 
@@ -51,23 +33,10 @@ export function FormLancamento({
   function enviarComprovante(arquivo: File) {
     setAviso(null);
     iniciarLeitura(async () => {
-      const dados = new FormData();
-      dados.append("arquivo", await reduzirFoto(arquivo));
-      let r = await lerComprovante(obraId, dados);
+      const r = await lerArquivo(obraId, arquivo);
       if (r.caminho) setComprovante(r.caminho);
-      if (r.semIA) {
-        // Leitura grátis no navegador (OCR).
-        try {
-          const lido = await lerComprovanteLocal(arquivo);
-          const achou = lido.valor != null || lido.data != null || lido.favorecido != null;
-          r = { ...r, ...lido, erro: achou ? undefined : "Comprovante guardado, mas não consegui ler os dados. Preencha os campos à mão." };
-        } catch (e) {
-          console.error("lerComprovanteLocal", e);
-          r = { ...r, erro: "Comprovante guardado, mas a leitura falhou. Preencha os campos à mão." };
-        }
-      }
       preencher("data", r.data);
-      preencher("valor", r.valor != null ? r.valor.toLocaleString("pt-BR", { minimumFractionDigits: 2, useGrouping: false }) : null);
+      preencher("valor", valorBrTexto(r.valor));
       preencher("fornecedor", r.favorecido?.toUpperCase());
       preencher("descricao", r.descricao?.toUpperCase());
       if (r.erro) setAviso({ tipo: "erro", texto: r.erro });
